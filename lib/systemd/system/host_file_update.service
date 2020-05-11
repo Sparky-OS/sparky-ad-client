@@ -1,0 +1,20 @@
+[Unit]
+Description=Update hosts file upon DHCP changes
+After=$network
+BindsTo=$network
+ReloadPropagatedFrom=$network
+ 
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStart=/etc/init.d/host_file_update start
+ExecStop=/etc/init.d/host_file_update stop
+ExecReload=/etc/init.d/host_file_update restart
+ 
+[Install]
+WantedBy=$network
+
+# /etc/init.d/host_file_update
+# needs
+# /lib/systemd/system/host_file_update.service
+#

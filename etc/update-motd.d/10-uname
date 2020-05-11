@@ -1,0 +1,2 @@
+echo SparkyOS Client based on
+uname -osnrvm

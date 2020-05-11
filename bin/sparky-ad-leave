@@ -1,0 +1,8 @@
+## To leave, remove from AD and remove configuration made
+realm leave --remove --user=administrator --verbose mybusiness.intranet
+echo "Removing configuration..."
+sudo sed -i '12 c\hosts:          files dns' /etc/nsswitch.conf
+sudo sed -i '16 c\use_fully_qualified_names = True' /etc/sssd/sssd.conf
+tail -n 1 "/etc/pam.d/common-session" | tee >(wc -c | xargs -I {} truncate "/etc/pam.d/common-session" -s -{})
+tail -n 1 "/etc/sudoers" | tee >(wc -c | xargs -I {} truncate "/etc/sudoers" -s -{})
+sudo sed -i '27 c\password        [success=2 default=ignore]      pam_winbind.so use_authtok try_first_pass' /etc/pam.d/common-account

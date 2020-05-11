@@ -1,0 +1,260 @@
+#!/bin/bash
+
+# sparky-ad-client script lets you connect and set up to the server edition or windows server on top of sparky instalation
+# Copyright Paweł Pijanowski "pavroo" <pavroo@onet.eu> & Daniel Campos Ramos "Capitain_Jack"
+# Under the GNU GPL3 License
+#
+# script deps: apt, bash, coreutils, dpkg, dialog, gawk, grep, hostname, nano, iputils-ping, sed, sparky-ntp-server
+#
+# Last update 2020/05/11 by Daniel
+
+## install pre-requisites For full usability as desired at a client station any hardware-able, as one can even just change the Sparky HD to another PC, upgrade parts and still have it full working
+aptitude install putty mkusb usb-pack-efi doc-base clamtk libclamunrar9 inkscape pstoedit firmware-realtek firmware-ralink firmware-misc-nonfree firmware-linux firmware-linux-nonfree command-not-found kio-extras kio-gdrive gimp-help-pt gimp-data-extras gimp-plugin-registry icc-profiles libtiff-opengl kdenlive audacity hplip-gui xsane kdebase-runtime libreoffice-kde openclipart-libreoffice ttf-mscorefonts-installer default-jre vlc deb-multimedia-keyring debian-keyring firmware-libertas firmware-iwlwifi firmware-intel-sound firmware-brcm80211 firmware-atheros bluez-firmware attr xattr xfsprogs libatm1 rename dbus-user-session kdeadmin kwin-x11 dolphin kde-runtime icoutils libcanberra-pulse udisks2 upower djvulibre-bin finger plasma-desktop bluedevil fonts-noto fonts-oxygen kde-config-gtk-style kde-config-screenlocker kde-config-cddb kde-config-sddm kde-style-oxygen-qt5 kde-style-qtcurve-qt4 kgamma5 khelpcenter khotkeys kinfocenter kio-extras kmenuedit kscreen ksshaskpass ksysguard kwrited libpam-kwallet5 plasma-pa powerdevil systemsettings user-manager sni-qt plasma-workspace gwenview kaddressbook kate kcalc knotes korganizer kwalletmanager okular plasma-dataengines-addons plasma-runners-addons plasma-wallpapers-addons plasma-widgets-addons policykit-1 polkit-kde-agent-1 sweeper plasma-nm sane-utils sane simple-scan kdegraphics kio-audiocd kscd ffmpegthumbs kamera kdenetwork kdenetwork-filesharing kde-zeroconf signon-ui-x11 kontact kdepim-addons accountwizard resolvconf avahi-daemon isc-dhcp-client hostname kdeutils firefox-esr gimp  libreoffice-kde system-config-printer system-config-printer-common system-config-printer-udev gtk2-engines-oxygen desktop-base xserver-xorg-input-all xserver-xorg-video-all eject xdg-utils gimp-data-extras gvfs-backends normalize-audio network-manager-openvpn network-manager-pptp network-manager-vpnc cdrskin sparky-aptus-upgrade-checker sparky-aptus-upgrade sparky-aptus-extra debtags libwebkit2gtk-4.0-37-gtk2 debconf-utils ethtool adcli sssd sssd-tools libnss-sss libpam-sss samba samba-common samba-libs samba-common-bin samba-dsdb-modules samba-vfs-modules smbclient libsmbclient qtsmbstatus-client smbldap-tools smbnetfs winbind libnss-winbind libpam-winbind cifs-utils debi-tool exfat-utils  libaacs0 libfile-mimeinfo-perl libgtk2-perl libjs-jquery libkf5config-bin libkf5iconthemes-bin libkf5kdelibs4support5-bin libmtp-runtime libqt5multimedia5-plugins xserver-xorg-legacy xserver-xorg-video-intel xserver-xorg-video-qxl xserver-xorg-input-synaptics  libvdpau-va-gl1 libvlc-bin mesa-utils mesa-va-drivers mesa-vdpau-drivers va-driver-all vdpau-driver-all qt5-image-formats-plugins sonnet-plugins gdisk packagekit coreutils sparky-grub-theme sparky-plymouth sparky-core sddm-theme-sparky xfonts-base fonts-dejavu fonts-hack-ttf -y
+
+## Install Language files for pre-requisites and missing on the system
+apt -q -y install gnupg-l10n qtsmbstatus-language qttranslations5-l10n
+
+# Verify user sudo privileges
+CLIENT=$(hostname)
+LOCALUSR=$(whoami)
+echo "Enter sudo password for $LOCALUSR at $CLIENT"
+sudo -v
+## Stop all samba related services
+systemctl stop smbd
+systemctl stop nmbd
+systemctl stop winbind
+systemctl stop samba
+## Backup actual samba install
+for f in /var/run/samba/*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
+for f in /var/run/samba/*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBoriginal/)"; done
+for f in /var/lib/samba/*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
+for f in /var/lib/samba/*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBoriginal/)"; done
+for f in /var/cache/samba*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
+for f in /var/cache/samba*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBoriginal/)"; done
+for f in /var/lib/samba/private*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
+for f in /var/lib/samba/private*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBoriginal/)"; done
+for f in /var/run/samba/*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
+for f in /var/run/samba/*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBoriginal/)"; done
+### TO RESET EVERYTHING!! Make this step now and in case of problems to start over ###
+rm -rfv /var/run/samba/*.tdb *.ldb
+rm -rfv /var/lib/samba/*.tdb *.ldb
+rm -rfv /var/cache/samba/*.tdb *.ldb
+rm -rfv /var/lib/samba/private/*.tdb *.ldb
+rm /var/lib/samba/private/krb5.conf
+rm /etc/samba/smb.conf
+#########
+
+# sudo DEBIAN_FRONTEND=noninteractive apt install libsss-sudo realmd sssd-tools krb5-user krb5-config sddm-theme-debian-elarun tdb-tools glusterfs-common libacl1-dev libattr1-dev libcephfs1 libdevmapper-event1.02.1 libibverbs1 liblvm2app2.2 librdmacm1 libuser1 psmisc python-certifi python-chardet python-crypto python-dnspython python-jwt python-ldb python-libuser python-prettytable python-requests python-samba python-tdb python-urllib3 -y
+
+echo "Enter the AD server IP number:"
+read ADIP
+echo "Adding AD DNS server..."
+echo "supersede domain-name-servers $ADIP;" >> /etc/dhcp/dhclient.conf
+echo "prepend domain-name-servers $ADIP;" >> /etc/dhcp/dhclient.conf
+systemctl restart networking.service
+sudo dhclient -r
+sudo dhclient
+echo "DNS sucessfuly added"
+echo "Enter the domain WORKGROUP name to join in small letters: hint: <domain>.TLD "
+read DOMAIN
+    echo "Enter the domain TLD name in small letters: hint: DOMAIN.<tld>"
+read TLD
+    echo "Trying connection..."
+sudo realm discover $DOMAIN.$TLD
+read -p "Is this Correct? " -n 1 -r
+    echo 
+while true; do
+        if [[ ! $REPLY =~ ^[Yy]$ ]];
+        then
+    echo "Enter the domain WORKGROUP name to join in small letters: hint: <domain>.TLD "
+read DOMAIN
+    echo "Enter the domain TLD name in small letters: hint: DOMANIN.<tld> "
+read TLD
+        echo "Trying connection..."
+        sudo realm discover $DOMAIN.$TLD
+        read -p "Is it Correct? " -n 1 -r
+        echo
+else
+    tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+    tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+    break
+fi
+done
+ADTLD=${DOMAIN^^}.${TLD^^}
+ADtld=$DOMAIN.$TLD
+echo "supersede domain-name \"$ADtld\";" >> /etc/dhcp/dhclient.conf
+echo "prepend domain-name \"$ADtld\";" >> /etc/dhcp/dhclient.conf
+echo "supersede domain-search \"$ADtld\";" >> /etc/dhcp/dhclient.conf
+echo "prepend domain-name \"$ADtld\";" >> /etc/dhcp/dhclient.conf
+sudo service ntp stop
+sudo ntpdate $ADtld
+sudo service ntp start
+echo "Enter Domain administrator account name: hint: default is administrator"
+read ADMIN
+# Join realm
+sudo realm join --user=$ADMIN --verbose $ADtld
+if [ $? -ne 0 ]; then
+        echo "AD join failed. Run 'journalctl -xn' if no reason was given."
+        echo "Removing DNS configuration from file.."
+        tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+        tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+        tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+        tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+        tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+        tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
+        rm /etc/sssd/sssd.conf
+        rm /etc/realmd.conf
+    exit 1
+fi
+## make after join configuration
+
+echo "[nss]" | sudo tee -a /etc/sssd/sssd.conf
+echo "filter_groups = root" | sudo tee -a /etc/sssd/sssd.conf
+echo "filter_users = root" | sudo tee -a /etc/sssd/sssd.conf
+echo "reconnection_retries = 3" | sudo tee -a /etc/sssd/sssd.conf
+echo " " | sudo tee -a /etc/sssd/sssd.conf
+echo "[pam]" | sudo tee -a /etc/sssd/sssd.conf
+echo "reconnection_retries = 3" | sudo tee -a /etc/sssd/sssd.conf
+echo " " | sudo tee -a /etc/sssd/sssd.conf
+echo "[sssd]" | sudo tee -a /etc/sssd/sssd.conf
+echo "domains = $myDomainName" | sudo tee -a /etc/sssd/sssd.conf
+echo "config_file_version = 2" | sudo tee -a /etc/sssd/sssd.conf
+echo "services = nss, pam" | sudo tee -a /etc/sssd/sssd.conf
+echo "default_domain_suffix = ${myDomainName^^}" | sudo tee -a /etc/sssd/sssd.conf
+echo " " | sudo tee -a /etc/sssd/sssd.conf
+echo "[domain/$myDomainName]" | sudo tee -a /etc/sssd/sssd.conf
+echo "ad_domain = $myDomainName" | sudo tee -a /etc/sssd/sssd.conf
+echo "krb5_realm = ${myDomainName^^}" | sudo tee -a /etc/sssd/sssd.conf
+echo "realmd_tags = manages-system joined-with-samba" | sudo tee -a /etc/sssd/sssd.conf
+echo "cache_credentials = True" | sudo tee -a /etc/sssd/sssd.conf
+echo "id_provider = ad" | sudo tee -a /etc/sssd/sssd.conf
+echo "krb5_store_password_if_offline = True" | sudo tee -a /etc/sssd/sssd.conf
+echo "default_shell = /bin/bash" | sudo tee -a /etc/sssd/sssd.conf
+echo "ldap_id_mapping = True" | sudo tee -a /etc/sssd/sssd.conf
+echo "use_fully_qualified_names = False" | sudo tee -a /etc/sssd/sssd.conf
+echo "fallback_homedir = /home/%u" | sudo tee -a /etc/sssd/sssd.conf
+echo "access_provider = ad" | sudo tee -a /etc/sssd/sssd.conf
+echo " " | sudo tee -a /etc/sssd/sssd.conf
+echo "auth_provider = ad" | sudo tee -a /etc/sssd/sssd.conf
+echo "chpass_provider = ad" | sudo tee -a /etc/sssd/sssd.conf
+echo "access_provider = ad" | sudo tee -a /etc/sssd/sssd.conf
+echo "ldap_schema = ad" | sudo tee -a /etc/sssd/sssd.conf
+echo "dyndns_update = true" | sudo tee -a /etc/sssd/sssd.conf
+echo "dyndns_refresh_interval = 43200" | sudo tee -a /etc/sssd/sssd.conf
+echo "dyndns_update_ptr = true" | sudo tee -a /etc/sssd/sssd.conf
+echo "dyndns_ttl = 3600" | sudo tee -a /etc/sssd/sssd.conf
+
+sudo chmod 700 /etc/sssd/sssd.conf
+
+echo "[active-directory]" | sudo tee -a /etc/realmd.conf
+echo "os-name = Linux Debian" | sudo tee -a /etc/realmd.conf
+echo "os-version = 9.5" | sudo tee -a /etc/realmd.conf
+echo " " | sudo tee -a /etc/realmd.conf
+echo "[service]" | sudo tee -a /etc/realmd.conf
+echo "automatic-install = yes" | sudo tee -a /etc/realmd.conf
+echo " " | sudo tee -a /etc/realmd.conf
+echo "[users]" | sudo tee -a /etc/realmd.conf
+echo "default-home = /home/%u" | sudo tee -a /etc/realmd.conf
+echo "default-shell = /bin/bash" | sudo tee -a /etc/realmd.conf
+echo " " | sudo tee -a /etc/realmd.conf
+echo "[$ADtld]" | sudo tee -a /etc/realmd.conf
+echo "user-principal = yes" | sudo tee -a /etc/realmd.conf
+echo "fully-qualified-names = no" | sudo tee -a /etc/realmd.conf
+
+## Configure Kerberos file
+echo "Configuring Kerberos file for the domain..."
+mv /etc/krb5.conf /etc/krb5.conf.bkp.$DOMAIN
+touch /etc/krb5.conf
+echo "[libdefaults]" | sudo tee -a /etc/krb5.conf
+echo "	default_realm = ${DOMAIN^^}.${TLD^^}" | sudo tee -a /etc/krb5.conf
+echo "	dns_lookup_realm = false" | sudo tee -a /etc/krb5.conf
+echo "	dns_lookup_kdc = true" | sudo tee -a /etc/krb5.conf
+
+## Configure Samba file
+touch /etc/samba/smb.conf
+echo "[global]" | sudo tee -a /etc/samba/smb.conf
+echo "       netbios name = ${CLIENT^^}" | sudo tee -a /etc/samba/smb.conf
+echo "       security = ads" | sudo tee -a /etc/samba/smb.conf
+echo "       workgroup = ${DOMAIN^^}" | sudo tee -a /etc/samba/smb.conf
+echo "       realm = $ADtld" | sudo tee -a /etc/samba/smb.conf
+echo "       server string = $ADIP" >> /etc/samba/smb.conf
+echo "       log file = /var/log/samba/%m.log" | sudo tee -a /etc/samba/smb.conf
+echo "       log level = 1" | sudo tee -a /etc/samba/smb.conf
+echo "       idmap config * : backend = ad" | sudo tee -a /etc/samba/smb.conf
+echo "       wins server = $ADIP" | sudo tee -a /etc/samba/smb.conf
+echo "       client signing = yes" | sudo tee -a /etc/samba/smb.conf
+echo "       client use spnego = yes" | sudo tee -a /etc/samba/smb.conf
+echo "       kerberos method = secrets and keytab" | sudo tee -a /etc/samba/smb.conf
+
+
+sudo net ads join -k
+## Enable AD users to logon
+echo "session required pam_mkhomedir.so skel=/etc/skel/ umask=0022" | sudo tee -a /etc/pam.d/common-session
+## Enable AD Users and Groups avaliable locally
+#sudo sed -i '27 c\password        [success=2 default=ignore]      pam_winbind.so try_first_pass' /etc/pam.d/common-password
+
+# configure sudo
+echo "domain\ admins ALL=(ALL:ALL) ALL" | sudo tee -a /etc/sudoers
+echo "set group_source dynamic" >> /etc/sudo.conf
+# Start and enable required services
+systemctl unmask smbd.service
+systemctl unmask nmbd.service
+systemctl unmask winbind.service
+systemctl unmask samba.service
+systemctl enable smbd.service
+systemctl enable nmbd.service   
+systemctl enable winbind.service
+systemctl start smbd
+systemctl start nmbd   
+systemctl start winbind
+
+sed -i '12 c\hosts:          files wins mdns4_minimal dns [NOTFOUND=return]' /etc/nsswitch.conf
+
+realm permit --all
+
+# remove domain required before user for logon and start sssd
+sed -i '16 c\use_fully_qualified_names = False' /etc/sssd/sssd.conf
+sed -i '17 c\fallback_homedir = /home/%u' /etc/sssd/sssd.conf
+
+domainname $ADtld
+
+## General SDDM configuration
+rm /etc/sddm.conf
+echo "[Autologin]" >> /etc/sddm.conf
+echo "Relogin=false" >> /etc/sddm.conf
+echo "Session=plasma.desktop" >> /etc/sddm.conf
+echo "User=" >> /etc/sddm.conf
+echo " " >> /etc/sddm.conf
+echo "[General]" >> /etc/sddm.conf
+echo "HaltCommand=" >> /etc/sddm.conf
+echo "RebootCommand=" >> /etc/sddm.conf
+echo "HideShells=/sbin/nologin,/bin/false" >> /etc/sddm.conf
+echo "Numlock=on" >> /etc/sddm.conf
+echo " " >> /etc/sddm.conf
+echo "[Theme]" >> /etc/sddm.conf
+echo "Current=debian-elarun" >> /etc/sddm.conf
+echo "CursorTheme=Adwaita" >> /etc/sddm.conf
+echo " " >> /etc/sddm.conf
+echo "[Users]" >> /etc/sddm.conf
+echo "MaximumUid=9999999999" >> /etc/sddm.conf
+echo "MinimumUid=500" >> /etc/sddm.conf
+echo " " >> /etc/sddm.conf
+echo "[Wayland]" >> /etc/sddm.conf
+echo "EnableHiDPI=true" >> /etc/sddm.conf
+echo " " >> /etc/sddm.conf
+echo "[X11]" >> /etc/sddm.conf
+echo "MinimumVT=7" >> /etc/sddm.conf
+echo "EnableHiDPI=true" >> /etc/sddm.conf
+
+systemctl restart realmd sssd
+systemctl enable sssd
+echo "$CLIENT has sucessfuly joined the $DOMAIN.$TLD domain using $ADMIN account. Please make sure network is enabled, reboot and you should be able to logon with any $CLIENT or $DOMAIN.$TLD credential."
+
+# enable host file update service
+
+update-rc.d host_file_update defaults
+update-rc.d host_file_update enable
+
+###
+
+exit 0

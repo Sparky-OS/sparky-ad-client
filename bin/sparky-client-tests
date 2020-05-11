@@ -1,0 +1,27 @@
+############## tests ##############
+ 
+# make sure it's possible to get an AD user info
+
+id MYBUSINESS\\administrator
+
+# must return this:
+uid=986000500(administrator@mybusiness.intranet) gid=986000513(domain users@mybusiness.intranet) grupos=986000513(domain users@mybusiness.intranet),986000519(enterprise admins@mybusiness.intranet),986000518(schema admins@mybusiness.intranet),986000520(group policy creator owners@mybusiness.intranet),986000512(domain admins@mybusiness.intranet),986000572(denied rodc password replication group@mybusiness.intranet)
+
+
+# make sure it's possible to switch to an AD user
+
+su - MYBUSINESS\\administrator
+
+# must return this:
+Creating directory '/home/administrator@mybusiness.intranet'.
+
+administrator@mybusiness.intranet@sparkysbclient:~$  
+
+# just switched > double check
+
+id Administrator
+
+# must return this:
+uid=986000500(administrator) gid=986000513(domain users) grupos=986000513(domain users),986000520(group policy creator owners),986000519(enterprise admins),986000512(domain admins),986000518(schema admins),986000572(denied rodc password replication group)
+
+##############################################################################################
