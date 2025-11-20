@@ -8,23 +8,34 @@
 #
 # Last update 2020/05/11 by Daniel
 
+#
+# This script is designed to connect a SparkyLinux machine to a Windows Server Active Directory (AD) domain.
+# It automates the process by installing all necessary prerequisites, configuring network settings, and joining the machine to the domain.
+#
+
 ## install pre-requisites For full usability as desired at a client station any hardware-able, as one can even just change the Sparky HD to another PC, upgrade parts and still have it full working
+# The following command installs a comprehensive list of packages required for full functionality as a client station.
+# This includes packages for hardware support, desktop environment, office applications, and AD integration tools.
 aptitude install putty mkusb usb-pack-efi doc-base clamtk libclamunrar9 inkscape pstoedit firmware-realtek firmware-ralink firmware-misc-nonfree firmware-linux firmware-linux-nonfree command-not-found kio-extras kio-gdrive gimp-help-pt gimp-data-extras gimp-plugin-registry icc-profiles libtiff-opengl kdenlive audacity hplip-gui xsane kdebase-runtime libreoffice-kde openclipart-libreoffice ttf-mscorefonts-installer default-jre vlc deb-multimedia-keyring debian-keyring firmware-libertas firmware-iwlwifi firmware-intel-sound firmware-brcm80211 firmware-atheros bluez-firmware attr xattr xfsprogs libatm1 rename dbus-user-session kdeadmin kwin-x11 dolphin kde-runtime icoutils libcanberra-pulse udisks2 upower djvulibre-bin finger plasma-desktop bluedevil fonts-noto fonts-oxygen kde-config-gtk-style kde-config-screenlocker kde-config-cddb kde-config-sddm kde-style-oxygen-qt5 kde-style-qtcurve-qt4 kgamma5 khelpcenter khotkeys kinfocenter kio-extras kmenuedit kscreen ksshaskpass ksysguard kwrited libpam-kwallet5 plasma-pa powerdevil systemsettings user-manager sni-qt plasma-workspace gwenview kaddressbook kate kcalc knotes korganizer kwalletmanager okular plasma-dataengines-addons plasma-runners-addons plasma-wallpapers-addons plasma-widgets-addons policykit-1 polkit-kde-agent-1 sweeper plasma-nm sane-utils sane simple-scan kdegraphics kio-audiocd kscd ffmpegthumbs kamera kdenetwork kdenetwork-filesharing kde-zeroconf signon-ui-x11 kontact kdepim-addons accountwizard resolvconf avahi-daemon isc-dhcp-client hostname kdeutils firefox-esr gimp  libreoffice-kde system-config-printer system-config-printer-common system-config-printer-udev gtk2-engines-oxygen desktop-base xserver-xorg-input-all xserver-xorg-video-all eject xdg-utils gimp-data-extras gvfs-backends normalize-audio network-manager-openvpn network-manager-pptp network-manager-vpnc cdrskin sparky-aptus-upgrade-checker sparky-aptus-upgrade sparky-aptus-extra debtags libwebkit2gtk-4.0-37-gtk2 debconf-utils ethtool adcli sssd sssd-tools libnss-sss libpam-sss samba samba-common samba-libs samba-common-bin samba-dsdb-modules samba-vfs-modules smbclient libsmbclient qtsmbstatus-client smbldap-tools smbnetfs winbind libnss-winbind libpam-winbind cifs-utils debi-tool exfat-utils  libaacs0 libfile-mimeinfo-perl libgtk2-perl libjs-jquery libkf5config-bin libkf5iconthemes-bin libkf5kdelibs4support5-bin libmtp-runtime libqt5multimedia5-plugins xserver-xorg-legacy xserver-xorg-video-intel xserver-xorg-video-qxl xserver-xorg-input-synaptics  libvdpau-va-gl1 libvlc-bin mesa-utils mesa-va-drivers mesa-vdpau-drivers va-driver-all vdpau-driver-all qt5-image-formats-plugins sonnet-plugins gdisk packagekit coreutils sparky-grub-theme sparky-plymouth sparky-core sddm-theme-sparky xfonts-base fonts-dejavu fonts-hack-ttf -y
 
 ## Install Language files for pre-requisites and missing on the system
+# The following command installs the language files for the previously installed prerequisites.
 apt -q -y install gnupg-l10n qtsmbstatus-language qttranslations5-l10n
 
 # Verify user sudo privileges
+# The following commands verify that the user has sudo privileges before proceeding with any system modifications.
 CLIENT=$(hostname)
 LOCALUSR=$(whoami)
 echo "Enter sudo password for $LOCALUSR at $CLIENT"
 sudo -v
 ## Stop all samba related services
+# The following commands stop all Samba-related services to prevent conflicts during the configuration process.
 systemctl stop smbd
 systemctl stop nmbd
 systemctl stop winbind
 systemctl stop samba
 ## Backup actual samba install
+# The following commands back up the existing Samba configuration files to prevent data loss.
 for f in /var/run/samba/*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
 for f in /var/run/samba/*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBoriginal/)"; done
 for f in /var/lib/samba/*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
@@ -36,6 +47,7 @@ for f in /var/lib/samba/private*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBori
 for f in /var/run/samba/*.tdb; do mv "$f" "$(echo "$f" | sed s/tdb/TDBoriginal/)"; done
 for f in /var/run/samba/*.ldb; do mv "$f" "$(echo "$f" | sed s/ldb/LDBoriginal/)"; done
 ### TO RESET EVERYTHING!! Make this step now and in case of problems to start over ###
+# The following commands remove all existing Samba database files to ensure a clean setup.
 rm -rfv /var/run/samba/*.tdb *.ldb
 rm -rfv /var/lib/samba/*.tdb *.ldb
 rm -rfv /var/cache/samba/*.tdb *.ldb
@@ -44,8 +56,10 @@ rm /var/lib/samba/private/krb5.conf
 rm /etc/samba/smb.conf
 #########
 
+# The following command is commented out, but it appears to be an alternative method for installing the necessary prerequisites.
 # sudo DEBIAN_FRONTEND=noninteractive apt install libsss-sudo realmd sssd-tools krb5-user krb5-config sddm-theme-debian-elarun tdb-tools glusterfs-common libacl1-dev libattr1-dev libcephfs1 libdevmapper-event1.02.1 libibverbs1 liblvm2app2.2 librdmacm1 libuser1 psmisc python-certifi python-chardet python-crypto python-dnspython python-jwt python-ldb python-libuser python-prettytable python-requests python-samba python-tdb python-urllib3 -y
 
+# The following commands interactively prompt the user for the AD server IP address, domain WORKGROUP name, and domain TLD.
 echo "Enter the AD server IP number:"
 read ADIP
 echo "Adding AD DNS server..."
@@ -60,9 +74,11 @@ read DOMAIN
     echo "Enter the domain TLD name in small letters: hint: DOMAIN.<tld>"
 read TLD
     echo "Trying connection..."
+# The following command discovers the specified AD domain.
 sudo realm discover $DOMAIN.$TLD
 read -p "Is this Correct? " -n 1 -r
     echo 
+# The following loop continues to prompt the user for the domain information until the user confirms that it is correct.
 while true; do
         if [[ ! $REPLY =~ ^[Yy]$ ]];
         then
@@ -75,27 +91,34 @@ read TLD
         read -p "Is it Correct? " -n 1 -r
         echo
 else
+    # The following commands remove the last two lines from the /etc/dhcp/dhclient.conf file.
     tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
     tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
     break
 fi
 done
+# The following commands set the ADTLD and ADtld variables.
 ADTLD=${DOMAIN^^}.${TLD^^}
 ADtld=$DOMAIN.$TLD
+# The following commands update the DHCP client configuration to use the AD server for DNS resolution and set the domain name for the client machine.
 echo "supersede domain-name \"$ADtld\";" >> /etc/dhcp/dhclient.conf
 echo "prepend domain-name \"$ADtld\";" >> /etc/dhcp/dhclient.conf
 echo "supersede domain-search \"$ADtld\";" >> /etc/dhcp/dhclient.conf
 echo "prepend domain-name \"$ADtld\";" >> /etc/dhcp/dhclient.conf
+# The following commands stop the local NTP service, synchronize the system time with the AD server, and then restart the NTP service to ensure proper Kerberos authentication.
 sudo service ntp stop
 sudo ntpdate $ADtld
 sudo service ntp start
 echo "Enter Domain administrator account name: hint: default is administrator"
 read ADMIN
 # Join realm
+# The following command joins the machine to the AD domain.
 sudo realm join --user=$ADMIN --verbose $ADtld
+# The following block of code is executed if the realm join command fails.
 if [ $? -ne 0 ]; then
         echo "AD join failed. Run 'journalctl -xn' if no reason was given."
         echo "Removing DNS configuration from file.."
+        # The following commands remove the DNS configuration from the /etc/dhcp/dhclient.conf file.
         tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
         tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
         tail -n 1 "/etc/dhcp/dhclient.conf" | tee >(wc -c | xargs -I {} truncate "/etc/dhcp/dhclient.conf" -s -{})
@@ -107,6 +130,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 ## make after join configuration
+# The following commands configure the System Security Services Daemon (SSSD) and realmd to manage user authentication and access control.
+# This includes setting up default home directories, shells, and other user-related settings.
 
 echo "[nss]" | sudo tee -a /etc/sssd/sssd.conf
 echo "filter_groups = root" | sudo tee -a /etc/sssd/sssd.conf
@@ -162,6 +187,7 @@ echo "user-principal = yes" | sudo tee -a /etc/realmd.conf
 echo "fully-qualified-names = no" | sudo tee -a /etc/realmd.conf
 
 ## Configure Kerberos file
+# The following commands create a new Kerberos configuration file (/etc/krb5.conf) with the appropriate realm and DNS lookup settings.
 echo "Configuring Kerberos file for the domain..."
 mv /etc/krb5.conf /etc/krb5.conf.bkp.$DOMAIN
 touch /etc/krb5.conf
@@ -171,6 +197,7 @@ echo "	dns_lookup_realm = false" | sudo tee -a /etc/krb5.conf
 echo "	dns_lookup_kdc = true" | sudo tee -a /etc/krb5.conf
 
 ## Configure Samba file
+# The following commands generate a new Samba configuration file (/etc/samba/smb.conf) with the necessary settings for AD integration, including security mode, workgroup, and realm.
 touch /etc/samba/smb.conf
 echo "[global]" | sudo tee -a /etc/samba/smb.conf
 echo "       netbios name = ${CLIENT^^}" | sudo tee -a /etc/samba/smb.conf
@@ -189,14 +216,18 @@ echo "       kerberos method = secrets and keytab" | sudo tee -a /etc/samba/smb.
 
 sudo net ads join -k
 ## Enable AD users to logon
+# The following command modifies the PAM (Pluggable Authentication Modules) configuration to automatically create home directories for AD users upon their first login.
 echo "session required pam_mkhomedir.so skel=/etc/skel/ umask=0022" | sudo tee -a /etc/pam.d/common-session
 ## Enable AD Users and Groups avaliable locally
+# The following command is commented out, but it appears to be an alternative method for enabling AD users and groups to be available locally.
 #sudo sed -i '27 c\password        [success=2 default=ignore]      pam_winbind.so try_first_pass' /etc/pam.d/common-password
 
 # configure sudo
+# The following commands add the "Domain Admins" group to the /etc/sudoers file, granting administrative privileges to all members of that group.
 echo "domain\ admins ALL=(ALL:ALL) ALL" | sudo tee -a /etc/sudoers
 echo "set group_source dynamic" >> /etc/sudo.conf
 # Start and enable required services
+# The following commands unmask, enable, and start all the necessary services for AD integration, including smbd, nmbd, winbind, and sssd.
 systemctl unmask smbd.service
 systemctl unmask nmbd.service
 systemctl unmask winbind.service
@@ -208,17 +239,20 @@ systemctl start smbd
 systemctl start nmbd   
 systemctl start winbind
 
+# The following command modifies the /etc/nsswitch.conf file to ensure that the system can resolve hostnames using wins and dns.
 sed -i '12 c\hosts:          files wins mdns4_minimal dns [NOTFOUND=return]' /etc/nsswitch.conf
 
 realm permit --all
 
 # remove domain required before user for logon and start sssd
+# The following commands configure SSSD to not require the domain name before the user name for logon and to use the /home/%u directory as the fallback home directory.
 sed -i '16 c\use_fully_qualified_names = False' /etc/sssd/sssd.conf
 sed -i '17 c\fallback_homedir = /home/%u' /etc/sssd/sssd.conf
 
 domainname $ADtld
 
 ## General SDDM configuration
+# The following commands create a new SDDM (Simple Desktop Display Manager) configuration file to customize the login screen and user session settings.
 rm /etc/sddm.conf
 echo "[Autologin]" >> /etc/sddm.conf
 echo "Relogin=false" >> /etc/sddm.conf
@@ -251,6 +285,7 @@ systemctl enable sssd
 echo "$CLIENT has sucessfuly joined the $DOMAIN.$TLD domain using $ADMIN account. Please make sure network is enabled, reboot and you should be able to logon with any $CLIENT or $DOMAIN.$TLD credential."
 
 # enable host file update service
+# The following commands enable a service that automatically updates the /etc/hosts file with the correct IP address and hostname information.
 
 update-rc.d host_file_update defaults
 update-rc.d host_file_update enable

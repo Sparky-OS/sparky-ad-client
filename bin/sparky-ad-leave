@@ -1,8 +1,21 @@
+#!/bin/bash
+
+#
+# This script is designed to disconnect a SparkyLinux machine from an Active Directory (AD) domain.
+# It removes the machine from the domain and reverts the configuration changes made by the `sparky-ad-client` script.
+#
+
 ## To leave, remove from AD and remove configuration made
+# The following command removes the machine from the AD domain.
 realm leave --remove --user=administrator --verbose mybusiness.intranet
 echo "Removing configuration..."
+# The following command reverts the changes made to the /etc/nsswitch.conf file, restoring the default hostname resolution order.
 sudo sed -i '12 c\hosts:          files dns' /etc/nsswitch.conf
+# The following command restores the `use_fully_qualified_names` setting in the /etc/sssd/sssd.conf file to its default value.
 sudo sed -i '16 c\use_fully_qualified_names = True' /etc/sssd/sssd.conf
+# The following command removes the `pam_mkhomedir.so` module from the /etc/pam.d/common-session file, disabling the automatic creation of home directories for domain users.
 tail -n 1 "/etc/pam.d/common-session" | tee >(wc -c | xargs -I {} truncate "/etc/pam.d/common-session" -s -{})
+# The following command removes the "Domain Admins" group from the /etc/sudoers file, revoking the administrative privileges granted to domain administrators.
 tail -n 1 "/etc/sudoers" | tee >(wc -c | xargs -I {} truncate "/etc/sudoers" -s -{})
+# The following command reverts the changes made to the /etc/pam.d/common-account file, restoring the original PAM configuration.
 sudo sed -i '27 c\password        [success=2 default=ignore]      pam_winbind.so use_authtok try_first_pass' /etc/pam.d/common-account

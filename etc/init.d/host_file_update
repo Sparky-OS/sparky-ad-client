@@ -12,8 +12,16 @@
 #
 set -e
 
+#
+# This script is an initialization script that manages the /etc/hosts file on a SparkyLinux machine.
+# It ensures that the hosts file is always up-to-date with the correct IP address and hostname information,
+# which is particularly important in environments where IP addresses are assigned dynamically via DHCP.
+#
+
 case "$1" in
   start)
+# The start action updates the /etc/hosts file with the current IP address and fully qualified domain name (FQDN) of the machine.
+# It retrieves the IP addresses (both IPv4 and IPv6) from the active network interface and adds corresponding entries to the /etc/hosts file.
 # Set the Client's hostname
 myHostName=$(cat /etc/hostname)
 myDomainName=$(domainname)
@@ -39,6 +47,8 @@ echo "$ipaddr6 $myFQDN $myHostName ${myFQDN^^} ${myHostName^^}" >> /etc/hosts
 exit 0
 ;;
     stop)
+# The stop action updates the /etc/hosts file to use the loopback address for the machine's hostname.
+# This ensures that the hostname can still be resolved locally even when the machine is not connected to a network.
 # Set the Client's hostname
 myHostName=$(cat /etc/hostname)
 myDomainName=$(domainname)
@@ -47,49 +57,5 @@ myFQDN=$myHostName.$myDomainName
 domainname $myDomainName
 # Lookup the current IP Address and strip it out of the result
 loaddr4=$(/sbin/ifconfig lo | grep 'inet '| cut -d: -f2 | awk '{ print $2}')
-loaddr6=$(/sbin/ifconfig lo | grep 'inet6 ' | awk '{ print $2}')
-rm -rf /etc/hosts
-touch /etc/hosts
-#  Add the Client's loopback IP Address to HostName at /etc/hosts
-echo "$loaddr4 localhost localhost.localdomain" >> /etc/hosts
-echo "$loaddr6 localhost localhost.localdomain ip6-localhost ip6-loopback" >> /etc/hosts
-echo " " >> /etc/hosts
-echo "$loaddr4 $myFQDN $myHostName ${myFQDN^^} ${myHostName^^}" >> /etc/hosts
-echo "$loaddr6 $myFQDN $myHostName ${myFQDN^^} ${myHostName^^}" >> /etc/hosts
-exit 0
-;;
-  restart)
-# Set the Client's hostname
-myHostName=$(cat /etc/hostname)
-myDomainName=$(domainname)
-echo "$myDomainName is being used as domain name"
-myFQDN=$myHostName.$myDomainName
-domainname $myDomainName
-# Lookup the current loopback IP Address and strip it out of the result
-loaddr4=$(/sbin/ifconfig lo | grep 'inet '| cut -d: -f2 | awk '{ print $2}')
-loaddr6=$(/sbin/ifconfig lo | grep 'inet6 ' | awk '{ print $2}')
-# Lookup the current IP Address and strip it out of the result
-ipaddr4=$(/sbin/ifconfig | grep 'inet '| grep -v '127.0.0.1' | cut -d: -f2 | awk '{ print $2}')
-ipaddr6=$(/sbin/ifconfig | grep 'inet6 '| grep -v '::1' | awk '{ print $2}') 
-# erase /etc/hosts and create a new one
-rm -rf /etc/hosts
-touch /etc/hosts
-#  Add the loopback IP Address back to /etc/hosts
-echo "$loaddr4 localhost localhost.localdomain" >> /etc/hosts
-echo "$loaddr6 localhost localhost.localdomain ip6-localhost ip6-loopback" >> /etc/hosts
-echo " " >> /etc/hosts
-#  Add the server's current IP Address and HostName to /etc/hosts
-echo "$ipaddr4 $myFQDN $myHostName ${myFQDN^^} ${myHostName^^}" >> /etc/hosts
-echo "$ipaddr6 $myFQDN $myHostName ${myFQDN^^} ${myHostName^^}" >> /etc/hosts
-exit 0
-;;
-    *)
-  echo "Use: /etc/init.d/host_file_update {start|stop|restart}"
-;;
-esac
-exit 0
-
-# /etc/init.d/host_file_update
-# needs
-# /lib/systemd/system/host_file_update.service
-#
+loaddr6=$(/sbin/if...
+[content truncated]
