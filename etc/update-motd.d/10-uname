@@ -1,2 +1,10 @@
+#!/bin/bash
+
+#
+# This script is a simple script that is used to display system information in the message of the day (MOTD).
+#
+
+# The following command prints the string "SparkyOS Client based on".
 echo SparkyOS Client based on
+# The following command prints the operating system, kernel name, node name (hostname), kernel release, kernel version, and machine hardware name.
 uname -osnrvm

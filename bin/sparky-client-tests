@@ -1,27 +1,40 @@
+#!/bin/bash
+
+#
+# This script is designed to verify the successful integration of a SparkyLinux machine with an Active Directory (AD) domain.
+# It provides a series of tests to ensure that the machine can correctly retrieve user information and that AD users can log in and function as expected.
+#
+
 ############## tests ##############
  
 # make sure it's possible to get an AD user info
+# The following command retrieves the user ID (UID), group ID (GID), and group memberships for a specified AD user.
+# This test verifies that the system can correctly communicate with the AD server and retrieve user information.
 
 id MYBUSINESS\\administrator
 
 # must return this:
-uid=986000500(administrator@mybusiness.intranet) gid=986000513(domain users@mybusiness.intranet) grupos=986000513(domain users@mybusiness.intranet),986000519(enterprise admins@mybusiness.intranet),986000518(schema admins@mybusiness.intranet),986000520(group policy creator owners@mybusiness.intranet),986000512(domain admins@mybusiness.intranet),986000572(denied rodc password replication group@mybusiness.intranet)
+# uid=986000500(administrator@mybusiness.intranet) gid=986000513(domain users@mybusiness.intranet) grupos=986000513(domain users@mybusiness.intranet),986000519(enterprise admins@mybusiness.intranet),986000518(schema admins@mybusiness.intranet),986000520(group policy creator owners@mybusiness.intranet),986000512(domain admins@mybusiness.intranet),986000572(denied rodc password replication group@mybusiness.intranet)
 
 
 # make sure it's possible to switch to an AD user
+# The following command switches to a specified AD user account.
+# This test verifies that AD users can successfully log in to the machine and that their home directories are created correctly.
 
 su - MYBUSINESS\\administrator
 
 # must return this:
-Creating directory '/home/administrator@mybusiness.intranet'.
+# Creating directory '/home/administrator@mybusiness.intranet'.
 
-administrator@mybusiness.intranet@sparkysbclient:~$  
+# administrator@mybusiness.intranet@sparkysbclient:~$
 
 # just switched > double check
+# The following command verifies that the user's identity is correctly recognized after switching to the AD user.
+# This test ensures that the user's security context is correctly established.
 
 id Administrator
 
 # must return this:
-uid=986000500(administrator) gid=986000513(domain users) grupos=986000513(domain users),986000520(group policy creator owners),986000519(enterprise admins),986000512(domain admins),986000518(schema admins),986000572(denied rodc password replication group)
+# uid=986000500(administrator) gid=986000513(domain users) grupos=986000513(domain users),986000520(group policy creator owners),986000519(enterprise admins),986000512(domain admins),986000518(schema admins),986000572(denied rodc password replication group)
 
 ##############################################################################################
