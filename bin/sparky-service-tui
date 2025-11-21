@@ -1,0 +1,521 @@
+#!/bin/bash
+# sparky-service-tui - TUI interface for SparkyOS Service Manager
+# Copyright SparkyOS Team
+# Under the GNU GPL3 License
+#
+# Text User Interface for managing services and tune schedules
+# Last update 2025/11/21
+
+# Source required libraries
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
+
+source "${LIB_DIR}/sparky-i18n.sh"
+source "${LIB_DIR}/sparky-service-lib.sh"
+
+# Detect language
+LANG_CODE=$(detect_language)
+
+# Dialog command - prefer whiptail, fallback to dialog
+if command -v whiptail &>/dev/null; then
+    DIALOG="whiptail"
+elif command -v dialog &>/dev/null; then
+    DIALOG="dialog"
+else
+    echo "Error: Neither whiptail nor dialog is installed."
+    exit 1
+fi
+
+# Dialog dimensions
+HEIGHT=20
+WIDTH=70
+MENU_HEIGHT=12
+
+# Check root privileges
+check_root() {
+    if [ "$EUID" -ne 0 ]; then
+        $DIALOG --title "$(get_string 'ERROR_ROOT_REQUIRED' "$LANG_CODE")" \
+                --msgbox "$(get_string 'ERROR_ROOT_REQUIRED' "$LANG_CODE")" \
+                10 60
+        exit 1
+    fi
+}
+
+# Main menu
+show_main_menu() {
+    while true; do
+        local choice=$($DIALOG --title "$(get_string 'APP_TITLE' "$LANG_CODE")" \
+                               --menu "$(get_string 'APP_DESCRIPTION' "$LANG_CODE")" \
+                               $HEIGHT $WIDTH $MENU_HEIGHT \
+                               "1" "$(get_string 'MENU_SERVICE_MANAGER' "$LANG_CODE")" \
+                               "2" "$(get_string 'MENU_TUNE_SCHEDULER' "$LANG_CODE")" \
+                               "3" "$(get_string 'MENU_VIEW_CONFIG' "$LANG_CODE")" \
+                               "4" "$(get_string 'MENU_EXIT' "$LANG_CODE")" \
+                               3>&1 1>&2 2>&3)
+
+        local exitstatus=$?
+        if [ $exitstatus -ne 0 ]; then
+            break
+        fi
+
+        case $choice in
+            1) show_service_menu ;;
+            2) show_tune_menu ;;
+            3) show_config_view ;;
+            4) break ;;
+        esac
+    done
+}
+
+# Service management menu
+show_service_menu() {
+    while true; do
+        local choice=$($DIALOG --title "$(get_string 'MENU_SERVICE_MANAGER' "$LANG_CODE")" \
+                               --menu "$(get_string 'SELECT_SERVICES' "$LANG_CODE")" \
+                               $HEIGHT $WIDTH $MENU_HEIGHT \
+                               "1" "List All Services" \
+                               "2" "List Running Services" \
+                               "3" "Manage Service" \
+                               "4" "Monitor Services" \
+                               "5" "Back to Main Menu" \
+                               3>&1 1>&2 2>&3)
+
+        local exitstatus=$?
+        if [ $exitstatus -ne 0 ] || [ "$choice" = "5" ]; then
+            break
+        fi
+
+        case $choice in
+            1) list_all_services ;;
+            2) list_running_services ;;
+            3) manage_service ;;
+            4) manage_monitored_services ;;
+        esac
+    done
+}
+
+# List all services
+list_all_services() {
+    local services=$(get_all_services)
+    local service_list=""
+    local count=1
+
+    while IFS= read -r service; do
+        local status=$(get_service_status "$service")
+        local enabled=$(get_service_enabled "$service")
+        service_list="${service_list}${count}|${service}|${status}|${enabled}\n"
+        ((count++))
+    done <<< "$services"
+
+    echo -e "$service_list" | column -t -s'|' | \
+        $DIALOG --title "All Services" \
+                --msgbox "$(cat)" \
+                $HEIGHT $WIDTH 3>&1 1>&2 2>&3 || true
+}
+
+# List running services
+list_running_services() {
+    local services=$(get_running_services)
+    local service_list=""
+
+    while IFS= read -r service; do
+        service_list="${service_list}${service}\n"
+    done <<< "$services"
+
+    echo -e "$service_list" | \
+        $DIALOG --title "Running Services" \
+                --msgbox "$(cat)" \
+                $HEIGHT $WIDTH 3>&1 1>&2 2>&3 || true
+}
+
+# Manage individual service
+manage_service() {
+    # Get service name
+    local service=$($DIALOG --title "Manage Service" \
+                            --inputbox "Enter service name:" \
+                            10 60 \
+                            3>&1 1>&2 2>&3)
+
+    if [ -z "$service" ]; then
+        return
+    fi
+
+    # Get service status
+    local status=$(get_service_status "$service")
+    local enabled=$(get_service_enabled "$service")
+
+    while true; do
+        local choice=$($DIALOG --title "Manage: $service" \
+                               --menu "Status: $status | Enabled: $enabled" \
+                               $HEIGHT $WIDTH $MENU_HEIGHT \
+                               "1" "Start Service" \
+                               "2" "Stop Service" \
+                               "3" "Restart Service" \
+                               "4" "Enable Service" \
+                               "5" "Disable Service" \
+                               "6" "View Status" \
+                               "7" "Back" \
+                               3>&1 1>&2 2>&3)
+
+        local exitstatus=$?
+        if [ $exitstatus -ne 0 ] || [ "$choice" = "7" ]; then
+            break
+        fi
+
+        case $choice in
+            1)
+                if start_service "$service"; then
+                    $DIALOG --title "Success" --msgbox "$(get_string 'SERVICE_STARTED' "$LANG_CODE")" 8 40
+                    status=$(get_service_status "$service")
+                else
+                    $DIALOG --title "Error" --msgbox "Failed to start service" 8 40
+                fi
+                ;;
+            2)
+                if stop_service "$service"; then
+                    $DIALOG --title "Success" --msgbox "$(get_string 'SERVICE_STOPPED' "$LANG_CODE")" 8 40
+                    status=$(get_service_status "$service")
+                else
+                    $DIALOG --title "Error" --msgbox "Failed to stop service" 8 40
+                fi
+                ;;
+            3)
+                if restart_service "$service"; then
+                    $DIALOG --title "Success" --msgbox "Service restarted" 8 40
+                    status=$(get_service_status "$service")
+                else
+                    $DIALOG --title "Error" --msgbox "Failed to restart service" 8 40
+                fi
+                ;;
+            4)
+                if enable_service "$service"; then
+                    $DIALOG --title "Success" --msgbox "Service enabled" 8 40
+                    enabled=$(get_service_enabled "$service")
+                else
+                    $DIALOG --title "Error" --msgbox "Failed to enable service" 8 40
+                fi
+                ;;
+            5)
+                if disable_service "$service"; then
+                    $DIALOG --title "Success" --msgbox "Service disabled" 8 40
+                    enabled=$(get_service_enabled "$service")
+                else
+                    $DIALOG --title "Error" --msgbox "Failed to disable service" 8 40
+                fi
+                ;;
+            6)
+                local full_status=$(systemctl status "$service.service" 2>&1 || true)
+                echo "$full_status" | $DIALOG --title "Service Status: $service" \
+                                              --programbox $HEIGHT $WIDTH || true
+                ;;
+        esac
+    done
+}
+
+# Manage monitored services
+manage_monitored_services() {
+    while true; do
+        local choice=$($DIALOG --title "Monitor Services" \
+                               --menu "Manage service monitoring" \
+                               $HEIGHT $WIDTH $MENU_HEIGHT \
+                               "1" "Add Service to Monitor" \
+                               "2" "Remove Service from Monitor" \
+                               "3" "View Monitored Services" \
+                               "4" "Back" \
+                               3>&1 1>&2 2>&3)
+
+        local exitstatus=$?
+        if [ $exitstatus -ne 0 ] || [ "$choice" = "4" ]; then
+            break
+        fi
+
+        case $choice in
+            1) add_service_to_monitor ;;
+            2) remove_service_from_monitor ;;
+            3) view_monitored_services ;;
+        esac
+    done
+}
+
+# Add service to monitoring
+add_service_to_monitor() {
+    local service=$($DIALOG --title "Add Service" \
+                            --inputbox "Enter service name to monitor:" \
+                            10 60 \
+                            3>&1 1>&2 2>&3)
+
+    if [ -n "$service" ]; then
+        if add_monitored_service "$service"; then
+            $DIALOG --title "Success" \
+                    --msgbox "Service $service added to monitoring" \
+                    8 50
+        else
+            $DIALOG --title "Info" \
+                    --msgbox "Service $service is already monitored" \
+                    8 50
+        fi
+    fi
+}
+
+# Remove service from monitoring
+remove_service_from_monitor() {
+    local services=$(get_monitored_services)
+
+    if [ -z "$services" ]; then
+        $DIALOG --title "Info" \
+                --msgbox "$(get_string 'NO_SERVICES_SELECTED' "$LANG_CODE")" \
+                8 40
+        return
+    fi
+
+    local menu_items=""
+    local count=1
+
+    while IFS= read -r service; do
+        menu_items="${menu_items}${count} ${service} "
+        ((count++))
+    done <<< "$services"
+
+    local choice=$($DIALOG --title "Remove Service" \
+                           --menu "Select service to remove:" \
+                           $HEIGHT $WIDTH $MENU_HEIGHT \
+                           $menu_items \
+                           3>&1 1>&2 2>&3)
+
+    if [ -n "$choice" ]; then
+        local service=$(echo "$services" | sed -n "${choice}p")
+        if remove_monitored_service "$service"; then
+            $DIALOG --title "Success" \
+                    --msgbox "Service $service removed from monitoring" \
+                    8 50
+        fi
+    fi
+}
+
+# View monitored services
+view_monitored_services() {
+    local services=$(get_monitored_services)
+
+    if [ -z "$services" ]; then
+        $DIALOG --title "Monitored Services" \
+                --msgbox "$(get_string 'NO_SERVICES_SELECTED' "$LANG_CODE")" \
+                10 50
+    else
+        echo "$services" | $DIALOG --title "Monitored Services" \
+                                   --msgbox "$(cat)" \
+                                   $HEIGHT $WIDTH || true
+    fi
+}
+
+# Tune scheduler menu
+show_tune_menu() {
+    while true; do
+        local choice=$($DIALOG --title "$(get_string 'MENU_TUNE_SCHEDULER' "$LANG_CODE")" \
+                               --menu "Manage sound schedules" \
+                               $HEIGHT $WIDTH $MENU_HEIGHT \
+                               "1" "Add Tune Schedule" \
+                               "2" "Remove Tune Schedule" \
+                               "3" "View Tune Schedules" \
+                               "4" "Test Sound" \
+                               "5" "Back to Main Menu" \
+                               3>&1 1>&2 2>&3)
+
+        local exitstatus=$?
+        if [ $exitstatus -ne 0 ] || [ "$choice" = "5" ]; then
+            break
+        fi
+
+        case $choice in
+            1) add_tune_schedule_dialog ;;
+            2) remove_tune_schedule_dialog ;;
+            3) view_tune_schedules ;;
+            4) test_sound_dialog ;;
+        esac
+    done
+}
+
+# Add tune schedule dialog
+add_tune_schedule_dialog() {
+    # Get service name
+    local service=$($DIALOG --title "Add Tune Schedule" \
+                            --inputbox "Enter service name:" \
+                            10 60 \
+                            3>&1 1>&2 2>&3)
+
+    if [ -z "$service" ]; then
+        return
+    fi
+
+    # Get time
+    local time=$($DIALOG --title "$(get_string 'SELECT_TIME' "$LANG_CODE")" \
+                         --inputbox "$(get_string 'SELECT_TIME' "$LANG_CODE")" \
+                         10 60 "09:00" \
+                         3>&1 1>&2 2>&3)
+
+    if [ -z "$time" ]; then
+        return
+    fi
+
+    # Get available sounds
+    local sounds=$(get_available_sounds)
+    local menu_items=""
+    local count=1
+
+    while IFS= read -r sound; do
+        menu_items="${menu_items}${count} ${sound} "
+        ((count++))
+    done <<< "$sounds"
+
+    # Add option for custom sound
+    menu_items="${menu_items}0 [Custom file path] "
+
+    local sound_choice=$($DIALOG --title "$(get_string 'SELECT_TUNE' "$LANG_CODE")" \
+                                 --menu "$(get_string 'SELECT_TUNE' "$LANG_CODE")" \
+                                 $HEIGHT $WIDTH $MENU_HEIGHT \
+                                 $menu_items \
+                                 3>&1 1>&2 2>&3)
+
+    if [ -z "$sound_choice" ]; then
+        return
+    fi
+
+    local sound
+    if [ "$sound_choice" = "0" ]; then
+        sound=$($DIALOG --title "Custom Sound" \
+                        --inputbox "Enter full path to sound file:" \
+                        10 60 \
+                        3>&1 1>&2 2>&3)
+    else
+        sound=$(echo "$sounds" | sed -n "${sound_choice}p")
+    fi
+
+    if [ -z "$sound" ]; then
+        return
+    fi
+
+    # Get days (optional)
+    local days=$($DIALOG --title "Select Days" \
+                         --inputbox "Days (0-6, 0=Sunday, * for all days):" \
+                         10 60 "*" \
+                         3>&1 1>&2 2>&3)
+
+    days="${days:-*}"
+
+    # Add schedule
+    if add_tune_schedule "$service" "$time" "$sound" "$days"; then
+        $DIALOG --title "Success" \
+                --msgbox "$(get_string 'CONFIG_SAVED' "$LANG_CODE")\nService: $service\nTime: $time\nSound: $sound\nDays: $days" \
+                12 60
+    else
+        $DIALOG --title "Error" \
+                --msgbox "Failed to add tune schedule. Check time format (HH:MM)" \
+                8 60
+    fi
+}
+
+# Remove tune schedule dialog
+remove_tune_schedule_dialog() {
+    local tunes=$(get_all_tunes)
+
+    if [ -z "$tunes" ]; then
+        $DIALOG --title "Info" \
+                --msgbox "No tune schedules configured" \
+                8 40
+        return
+    fi
+
+    local menu_items=""
+    local count=1
+
+    while IFS=: read -r service time sound days; do
+        menu_items="${menu_items}${count} '${service} at ${time}' "
+        ((count++))
+    done <<< "$tunes"
+
+    local choice=$($DIALOG --title "Remove Tune Schedule" \
+                           --menu "Select schedule to remove:" \
+                           $HEIGHT $WIDTH $MENU_HEIGHT \
+                           $menu_items \
+                           3>&1 1>&2 2>&3)
+
+    if [ -n "$choice" ]; then
+        local selected_tune=$(echo "$tunes" | sed -n "${choice}p")
+        local service=$(echo "$selected_tune" | cut -d: -f1)
+        local time=$(echo "$selected_tune" | cut -d: -f2)
+
+        if remove_tune_schedule "$service" "$time"; then
+            $DIALOG --title "Success" \
+                    --msgbox "Tune schedule removed" \
+                    8 40
+        fi
+    fi
+}
+
+# View tune schedules
+view_tune_schedules() {
+    local tunes=$(get_all_tunes)
+
+    if [ -z "$tunes" ]; then
+        $DIALOG --title "Tune Schedules" \
+                --msgbox "No tune schedules configured" \
+                10 50
+    else
+        echo "$tunes" | column -t -s':' | \
+            $DIALOG --title "Tune Schedules" \
+                    --msgbox "Format: Service:Time:Sound:Days\n\n$(cat)" \
+                    $HEIGHT $WIDTH || true
+    fi
+}
+
+# Test sound
+test_sound_dialog() {
+    local sounds=$(get_available_sounds)
+    local menu_items=""
+    local count=1
+
+    while IFS= read -r sound; do
+        menu_items="${menu_items}${count} ${sound} "
+        ((count++))
+    done <<< "$sounds"
+
+    local choice=$($DIALOG --title "Test Sound" \
+                           --menu "Select sound to test:" \
+                           $HEIGHT $WIDTH $MENU_HEIGHT \
+                           $menu_items \
+                           3>&1 1>&2 2>&3)
+
+    if [ -n "$choice" ]; then
+        local sound=$(echo "$sounds" | sed -n "${choice}p")
+        local sound_path=$(get_sound_path "$sound")
+
+        if [ -n "$sound_path" ]; then
+            play_sound "$sound_path"
+            $DIALOG --title "Playing" \
+                    --msgbox "Playing: $sound" \
+                    8 50
+        else
+            $DIALOG --title "Error" \
+                    --msgbox "Sound file not found: $sound" \
+                    8 50
+        fi
+    fi
+}
+
+# View configuration
+show_config_view() {
+    local config_file=$(export_config)
+
+    cat "$config_file" | $DIALOG --title "$(get_string 'MENU_VIEW_CONFIG' "$LANG_CODE")" \
+                                 --programbox $HEIGHT $WIDTH || true
+
+    rm -f "$config_file"
+}
+
+# Main execution
+main() {
+    check_root
+    init_config
+    show_main_menu
+}
+
+main "$@"
