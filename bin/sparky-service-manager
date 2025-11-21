@@ -1,0 +1,168 @@
+#!/bin/bash
+# sparky-service-manager - Main launcher for SparkyOS Service Manager
+# Copyright SparkyOS Team
+# Under the GNU GPL3 License
+#
+# Auto-detects and launches GUI or TUI interface
+# Last update 2025/11/21
+
+# Script directory
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+
+# Check if running in a graphical environment
+is_graphical() {
+    # Check if DISPLAY is set
+    if [ -n "$DISPLAY" ]; then
+        return 0
+    fi
+
+    # Check if running in Wayland
+    if [ -n "$WAYLAND_DISPLAY" ]; then
+        return 0
+    fi
+
+    # Check if running in X11
+    if xset q &>/dev/null; then
+        return 0
+    fi
+
+    return 1
+}
+
+# Check available GUI tools
+has_gui_tools() {
+    command -v yad &>/dev/null || command -v zenity &>/dev/null
+}
+
+# Check available TUI tools
+has_tui_tools() {
+    command -v whiptail &>/dev/null || command -v dialog &>/dev/null
+}
+
+# Show usage
+show_usage() {
+    cat << EOF
+SparkyOS Service Manager - Multi-language service and tune scheduler
+
+Usage: $(basename "$0") [OPTIONS]
+
+Options:
+  -g, --gui        Force GUI mode (requires yad or zenity)
+  -t, --tui        Force TUI mode (requires dialog or whiptail)
+  -h, --help       Show this help message
+  -v, --version    Show version information
+
+If no option is specified, the interface is auto-detected based on the environment.
+
+Examples:
+  $(basename "$0")           # Auto-detect and launch appropriate interface
+  $(basename "$0") --gui     # Force GUI mode
+  $(basename "$0") --tui     # Force TUI mode
+
+Requirements:
+  - Root privileges (sudo)
+  - For GUI: yad or zenity
+  - For TUI: dialog or whiptail
+
+Features:
+  - Service management (start, stop, restart, enable, disable)
+  - Service monitoring
+  - Time-based sound notification scheduling
+  - Multi-language support (all Debian-supported languages)
+
+EOF
+}
+
+# Show version
+show_version() {
+    cat << EOF
+SparkyOS Service Manager v1.0
+Copyright (C) 2025 SparkyOS Team
+License: GNU GPL v3
+
+Part of SparkyOS - Debian-based Linux for Small Businesses
+EOF
+}
+
+# Main function
+main() {
+    local force_mode=""
+
+    # Parse arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -g|--gui)
+                force_mode="gui"
+                shift
+                ;;
+            -t|--tui)
+                force_mode="tui"
+                shift
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            -v|--version)
+                show_version
+                exit 0
+                ;;
+            *)
+                echo "Unknown option: $1"
+                echo "Use --help for usage information"
+                exit 1
+                ;;
+        esac
+    done
+
+    # Check root privileges
+    if [ "$EUID" -ne 0 ]; then
+        echo "Error: This script requires root privileges."
+        echo "Please run with sudo: sudo $0 $@"
+        exit 1
+    fi
+
+    # Determine which interface to use
+    local use_gui=false
+    local use_tui=false
+
+    if [ "$force_mode" = "gui" ]; then
+        use_gui=true
+    elif [ "$force_mode" = "tui" ]; then
+        use_tui=true
+    else
+        # Auto-detect
+        if is_graphical && has_gui_tools; then
+            use_gui=true
+        elif has_tui_tools; then
+            use_tui=true
+        elif has_gui_tools; then
+            use_gui=true
+        else
+            echo "Error: No suitable interface found."
+            echo "Please install one of the following:"
+            echo "  - For GUI: yad or zenity"
+            echo "  - For TUI: dialog or whiptail"
+            exit 1
+        fi
+    fi
+
+    # Launch appropriate interface
+    if [ "$use_gui" = true ]; then
+        if ! has_gui_tools; then
+            echo "Error: GUI mode requested but no GUI tools available."
+            echo "Please install yad or zenity."
+            exit 1
+        fi
+        exec "${SCRIPT_DIR}/sparky-service-gui" "$@"
+    elif [ "$use_tui" = true ]; then
+        if ! has_tui_tools; then
+            echo "Error: TUI mode requested but no TUI tools available."
+            echo "Please install dialog or whiptail."
+            exit 1
+        fi
+        exec "${SCRIPT_DIR}/sparky-service-tui" "$@"
+    fi
+}
+
+main "$@"
