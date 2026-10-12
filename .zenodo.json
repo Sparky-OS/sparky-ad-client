@@ -1,0 +1,29 @@
+{
+  "title": "sparky-ad-client: join a workstation to an Active Directory domain",
+  "description": "Joins a SparkyLinux or Debian workstation to an Active Directory domain, with a text and a graphical service manager.",
+  "creators": [
+    {
+      "name": "Ramos, Daniel Campos",
+      "orcid": "0009-0001-4546-8673"
+    }
+  ],
+  "license": "gpl-3.0-or-later",
+  "upload_type": "software",
+  "access_right": "open",
+  "keywords": [
+    "SparkyLinux",
+    "Debian",
+    "small-business server",
+    "Bash",
+    "Active Directory",
+    "Kerberos",
+    "Samba"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://sparkylinux.org/",
+      "relation": "isPartOf",
+      "scheme": "url"
+    }
+  ]
+}
