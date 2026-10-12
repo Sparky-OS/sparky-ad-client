@@ -1,5 +1,7 @@
 # Sparky AD Client
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23309042.svg)](https://doi.org/10.5281/zenodo.23309042)
+
 This repository provides a set of scripts to join a SparkyLinux machine to a Windows Server Active Directory (AD) domain, plus a comprehensive service manager with multilingual support for small business environments. It automates the process of installing prerequisites, configuring system settings, joining the domain, and managing system services with time-based sound notifications.
 
 ## Features
